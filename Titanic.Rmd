@@ -1,0 +1,855 @@
+---
+title: "Estudo sobre a base Titanic"
+author: "Leandro Duarte"
+date: "06/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, echo=FALSE, eval=TRUE}
+# Use getwd() para ver se está no diretório correto
+df<-read.csv2("titanic.csv",colClasses = c("factor", "factor","factor","numeric","integer","integer","numeric", "factor","factor")) #Como importei a base - com os tipos corretos
+
+# Usar attach(df) se não quiser ficar digitando df$ em cada variável
+
+```
+## Introdução e Resumo.
+
+O objetivo primordial deste estudo é aplicar os conhecimentos aprendidos em Estatística Computacional com o professor Luís Machado (MECD), apresentando os passos e comandos utilizados no R. Além disso, foi ambicionado fazer uma Análise Descritiva (Uni e Multidimensional), Estimação (Pontual e Intervalar) e, por fim, apresentar alguns modelos para a previsão da variável resposta.
+
+Para cumprir tais objetivos, foi escolhido trabalhar com a base de dados Titanic porque ela apresenta uma quantidade razoável de variáveis explicativas qualitativas (ordinais e nominais) e quantitativas (discretas e contínuas). Ademais, referida base é proveniente de um acidente histórico real que até hoje é relembrado pelas pessoas, às quais assistiram aos filmes e foram (ou desejaram ir) ao museu do Titanic, em Belfast.
+
+Com efeito, o **RMS Titanic** foi um navio luxuoso construído para ser 'inafundável'. Partiu dia 10 de abril de 1912 com 2224 pessoas (passageiros e tripulantes) e o acidente ocorreu dia 15 de abril daquele ano, acarretando provavelmente em **mais de 1500 mortes** (foi estimado que o total de mortes está entre 1490 e 1635) [(ver Wikipédia)](https://en.wikipedia.org/wiki/Titanic).
+
+Considerando que a base que temos acesso possui informações sobre **`r nrow(df)`** passageiros, ou seja, praticamente todos os existentes (2224 - 688 tripulantes = 1536), as medidas calculadas seriam populacionais e não amostrais, o que inviabilizaria fazer inferências ou construir modelos. Então, todo o exposto será uma abstração para focarmos nas técnicas computacionais e estatísticas.
+
+Dito isto, consideramos que estamos interessados em determinar qual é a proporção de passageiros que sobreviveram ao acidente e também prever se um passageiro sobreviveu ao acidente, tendo posse de algumas informações sobre ele. Consideraremos que a variável resposta será **survived**, caracterizada por 1 se o passageiro sobreviveu ao acidente ou 0 em caso contrário. A **proporção de sobreviventes** estimada para a população foi de **0,382**.
+
+Pela Análise da Descritiva, percebemos que a proporção de **mulheres** que sobreviveram ao acidente foi **maior** que a dos **homens** (**72,75%** contra **19,10%**). Também percebemos que as pessoas que viajaram na **primeira** classe tiveram uma proporção **maior** de sobreviventes (de **61,92%** contra **25,53%** dos que viajaram na **terceira** classe). Pessoas que embarcaram no porto **"C" (Cherbourg)** também possuíram uma proporção **maior** de sobreviventes (**55,56%** contra **33,56%** nos outros portos). Através da idade, percebemos que as **crianças e jovens** tiveram uma proporção **maior** de sobreviventes. Quanto à **fare**, vemos que os passageiros que pagaram **mais** nas passagens também tiveram uma proporção **maior** de sobreviventes. Pessoas que embarcaram **sozinhas** tiveram **menor** proporção de sobreviventes, sendo que recolhemos esta informação utilizando as variáveis **sibsp** e **parch**.
+
+Também encontramos alguns problemas nas variáveis, tais como número considerável de valores faltantes na *age*, presença de valores extremos na variável **fare** e muitos valores concentrados no zero nas variáveis **sibsp** e **parch**.
+
+No tocante à Inferência Estatística, obtivemos a estimativa pontual de **0,382** e construímos o intervalo **[0,356 ; 0,408]** com grau de confiança de 95% para a proporção de passageiros sobreviventes. Utilizando intervalos de confiança e Testes de Hipóteses (utilizando nível de significância de 5%), vimos quais diferenças encontradas na Análise Descritiva são significativas.
+
+No capítulo referente à Modelagem, apresentamos modelos de Árvores de Decisão Simples, Regressão Logística e KNN, além de mostrarmos algumas técnicas de pré-processamento, construções de novas variáveis explicativas, combinações de modelos, critérios de seleção de modelos e também formas de tentar aumentar a acurácia na previsão da variável resposta através da "votação" de todos os modelos. Se optássemos por escolher o modelo que forneceu a maior acurácia total, escolheríamos o obtido pelo KNN (com k=15), o qual forneceu a acurácia total de **81,17%** para a base de validação.
+
+## Análise Descritiva Univariada.
+
+    1. Dicionário de variáveis
+
++ **survived**: Sobrevivência (ou não) dos passageiros. Possíveis valores: 0 (morreu) ou 1 (sobreviveu);
+
++ **pclass**: Classe do Bilhete. Possíveis valores: 1(primeira), 2(segunda) ou 3 (terceira);
+`
++ **sex**: Gênero do passageiro. Possíveis valores: female (feminino) ou male (masculino);
+
++ **age**: Idade (em anos). Possíveis valores: para crianças menores de um ano, a idade pode assumir um valor contínuo (no intervalo  ]0,1[). Para mais velhos que isso, usa-se o valores discretos  {1,2,3...}. Quando tem o valor da forma xx.5 é porque a idade da pessoa foi estimada.
+
++ **sibsp**: Número de irmãos e/ou esposos a bordo. Possíveis valores: {0,1,2,3...};
+
++ **parch**: Número de pais e/ou filhos a bordo. Possíveis valores: {0,1,2,3...};
+
++ **fare**: Valor da tarifa paga. Possíveis valores: ]0,+∞[;
+
++ **embarked**: Porto de Embarque. Possíveis valores: C (Cherbourg), Q (Queenstown) ou S (Southampton);
+
++ **death**: Morte (ou não) do passageiro. Possíveis valores: 0 (não morreu) ou 1(morreu). Esta variável será descartada porque foi obtida pela variável **survived**.
+
+Observe o tipo das variáveis e depois os primeiros registros em forma tabular:
+
+```{r, echo=TRUE, eval=TRUE}
+df<-subset(df, select=-death)
+str(df)
+head(df)
+```
+
+Também vale observar a tabela resumo, pois ela apresenta as frequências das variáveis qualitativas, medidas descritivas das variáveis quantitativas e a quantidade de registros faltantes em cada atributo:
+
+```{r}
+summary(df)
+```
+
+Percebemos pela tabela resumo que cada categoria das variáveis qualitativas possuem ao menos 10% de representantes, ou seja, teremos mais de 130 observações para tirarmos conclusões.
+
+Quanto às informações faltantes, a única variável **alarmante** é a **age** (20,09% dos registros). Veremos, na seção 3.2, algumas formas de contornar este problema.
+
+    2. Variáveis Qualitativas
+
+    2.1 Variáveis Qualitativas Nominais
+    
+**Sex** (female ou male)
+
+```{r, echo=TRUE}
+label.pie<-c("Feminino","Masculino")
+freq<-round(table(df$sex)/nrow(df)*100,2)
+label.pie<-paste(label.pie,freq)
+label.pie<-paste(label.pie,"%",sep="")
+pie(x=table(df$sex), labels=label.pie, col = c("lightpink", "lightblue"))
+```
+
+Das `r  nrow(df)` observações, temos 466 mulheres (35,60%) e
+843 homens (64,40%), ou seja, não temos valores faltantes e há predominância de homens na amostra. No gráfico a seguir, veremos se o gênero do passageiro ajudaria a explicar sua sobrevivência (ou não) ao acidente.
+
+```{r, echo=TRUE}
+barplot(table(df$survived,df$sex), xlab="Sobrevivência por Sexo", ylab="Frequência",
+        legend.text = TRUE, beside=FALSE)
+```
+
+Pela apreciação desse gráfico, percebe-se que a **proporção** de sobreviventes das **mulheres** é **bem superior** a dos **homens** (**72,75%** contra **19,09%**), indicando assim que o gênero pode ajudar a explicar a sobrevivência de um passageiro.
+
+**Embarked** (C - Cherbourg, Q - Queenstown ou S - Southampton)
+
+```{r, echo=TRUE}
+label.pie<-c("Na", "C","Q", "S")
+freq<-round(table(df$embarked)/nrow(df)*100,2)
+label.pie<-paste(label.pie,freq)
+label.pie<-paste(label.pie,"%",sep="")
+pie(x=table(df$embarked), labels=label.pie)
+```
+
+Percebemos que o Porto de **S** (Southampton) é o **mais frequente** e que esta variável possui apenas 2 valores faltantes. Quanto ao comportamento desta variável em relação à resposta, temos:
+
+```{r, echo=TRUE}
+barplot(table(df$survived,df$embarked), xlab="Sobrevivência por Porto de Embarque", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Pela apreciação do gráfico, percebemos que a proporção de sobreviventes no porto C é **maior** que a proporção dos outros portos. Além disso, temos que a proporção de sobreviventes no porto Q está **próxima** da do S. Veremos no capítulo de Inferência Estatística se essas 3 categorias possuem diferenças significativas.
+
+    2.2 Variáveis Qualitativas Ordinais
+
+**Pclass** (1, 2 ou 3)
+
+```{r}
+label.pie<-c("Primeira","Segunda", "Terceira")
+freq<-round(table(df$pclass)/nrow(df)*100,2)
+label.pie<-paste(label.pie,freq)
+label.pie<-paste(label.pie,"%",sep="")
+pie(x=table(df$pclass), labels=label.pie)
+```
+
+Observando o gráfico acima, percebemos que a **Terceira** classe é a **mais frequente**. Quanto a proporção de sobreviventes, temos:
+
+```{r, echo=TRUE}
+barplot(table(df$survived,df$pclass), xlab="Sobrevivência por Classe de Embarque", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Temos a sugestão de que quanto **pior** é a classe **menor** é a proporção de sobreviventes.
+
+    3. Variáveis Quantitativas
+
+    3.1 Variáveis Quantitativas Discretas
+
+**Sibsp** (Número de irmãos e/ou esposos)
+
+```{r, echo=TRUE}
+layout(matrix(c(1,2),ncol=2))
+hist(df$sibsp, freq = TRUE ,ylab = "Frequência", xlab="Número de irmãos e/ou esposos",main="")
+boxplot(df$sibsp)
+```
+
+Pelos gráficos acima, percebe-se que a **maioria** dos passageiros embarcou **sozinha** ou com apenas um(a) irmã(o) (ou esposo(a)). De fato, **apenas 4,35%** dos passageiros possuía 3 ou mais irmãos.
+Levando isto em consideração, um gráfico de barras nos fornece uma visualização melhor. Nesse sentido, aprecie o seguinte gráfico:
+
+```{r, echo=TRUE}
+barplot(table(df$survived,df$sibsp), xlab="Sobrevivência por número de irmãos", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Vemos pelo gráfico que os passageiros que embarcaram com 1 ou 2 irmãos tiveram uma proporção **maior** de sobreviventes e os que possuíam 3 ou mais irmãos tiveram as **menores** proporções de sobreviventes.
+
+**Parch** (Número de pais e/ou filhos a bordo)
+
+```{r, echo=TRUE}
+layout(matrix(c(1,2),ncol=2))
+hist(df$parch, freq = TRUE ,ylab = "Frequência", xlab="Número de pais e/ou filhos",main="")
+boxplot(df$parch)
+```
+
+Assim como na **sibsp**, a **maioria** dos passageiros embarcou **sozinha** ou possuía apenas um ou dois filhos (ou pais). Utilizando o mesmo raciocínio da variável anterior, temos:
+
+```{r, echo=TRUE}
+barplot(table(df$survived,df$parch), xlab="Sobrevivência por número de pais ou filhos", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Aqui parece que ter embarcado com filhos (ou pais) **aumentou** a proporção de sobreviventes, pese o fato de haver poucas observações com valores diferentes de 0.  
+
+    3.2 Variáveis Quantitativas Contínuas
+
+**Age**
+
+```{r, echo=TRUE}
+layout(matrix(c(1,2),ncol=2))
+hist(df$age, freq = TRUE ,ylab = "Frequência", xlab="Idade",main="")
+boxplot(df$age)
+```
+
+Pela apreciação dos gráficos, percebe-se que as faixas ]20,25] e ]25,30] são as **mais frequentes**, com uma leve assimetria à direita. Para ilustramos nossa assertiva, observe a distribuição da amostra com a comparação de uma curva normal.
+
+```{r}
+hist(df$age, freq = FALSE ,ylab = "Densidade", xlab="Idade",main="")
+curve(dnorm(x,mean = mean(df$age, na.rm = TRUE),sd=sd(df$age, na.rm = TRUE)),add=TRUE)
+rug(df$age)
+abline(v=mean(df$age, na.rm = TRUE),col="red")
+```
+
+O gráfico abaixo serve para compararmos as distribuições dos passageiros que sobreviveram e a dos que faleceram no acidente. Elas aparentam ser muito semelhantes.
+
+```{r}
+boxplot(df$age~df$survived, ylab = "Idade", xlab="Sobrevivência",main="")
+```
+
+Porém, observando os respectivos histogramas, percebe-se que **crianças e adolescentes** tiveram uma proporção **maior** de sobreviventes.
+
+```{r}
+mor<-df$age[df$survived==0]
+viv<-df$age[df$survived==1]
+
+layout(matrix(c(1,2),ncol=1))
+hist(mor, freq = FALSE, breaks = 12, xlab = "Falecidos", ylab="Densidade", main="")
+hist(viv, freq = FALSE, col = "lightblue", breaks = 12, xlab = "Sobreviventes",ylab="Densidade", main="")
+```
+
+Por fim, temos que esta variável apresenta **20.09%** de seus valores faltantes. Além disso, há a sugestão de que sua proporção de sobreviventes é **menor** quando comparada à dos adultos (**27,76%** contra **38,77%**).
+
+Como algumas técnicas de modelagem não permitem a utilização de "missings", costuma-se contornar esse problema com uma das seguintes formas:
+
+1. removendo registros faltantes da base;
+2. substituindo os valores faltantes por alguma medida de centralidade (mediana, média ou a moda amostrais);
+3. excluindo a variável do modelo;
+
+Entre essas opções, a segunda se afigura como mais razoável, pese o fato de suspeitarmos que não saber a idade pode representar também uma fonte de "informação". Então usaremos a média amostral para substituir os valores faltantes e chamaremos essa "nova" variável de **age_2** e também trabalharemos considerando a idade como uma variável categórica denominada de **faixa_etaria**.
+
+**Fare**
+
+```{r}
+hist(df$fare, ylab = "Frequência", xlab = "Valor da Tarifa", main="")
+```
+
+Percebemos que a variável **fare** possui valores mais concentrados à esquerda do gráfico e também apresenta alguns valores extremos que acabam por aumentar a amplitude de cada intervalo, dificultando nossa visualização. Antes de fazermos algum tipo de ajuste (aumentando o número de "bins", agrupando alguns valores ou removendo os "outliers"), é de bom alvitre olharmos o comportamento desta variável em relação à resposta.
+
+```{r}
+boxplot(df$fare~df$survived, ylab = "Valor da Tarifa", xlab="Sobrevivência",main="")
+```
+
+Mesmo com os valores extremos distorcendo a escala, percebe-se que os que pagaram **tarifas mais altas** tiveram uma proporção **maior** de sobreviventes. Porém, será que este resultado não está melhor descrito pela variável **pclass**? Para respondermos esse e outros questionamentos, faremos uma Análise Descritiva Multivariada.
+
+## Análise Descritiva Multivariada.
+
+    1. Embarked (Porto de Embarque) vs pclass (Classe da Viagem)
+
+Nas seções anteriores, vimos que as pessoas que estavam na primeira classe e as que embarcaram no Porto C tiveram maiores proporções de sobreviventes. Será que há associação entre essas duas variáveis?
+
+```{r}
+layout(matrix(c(1,2),ncol=2))
+barplot(table(df$embarked,df$pclass), xlab="Classe por Porto", ylab="Frequência",
+        legend.text = TRUE, beside=FALSE)
+
+barplot(table(df$pclass, df$embarked), xlab="Embarque por Classe", ylab="",
+        legend.text = TRUE, beside=FALSE)
+```
+
+Pela apreciação desses gráficos, percebe-se que os que embarcaram no porto C foram para as três classes, embora haja predominância na primeira. Além disso, vemos que os que embarcaram no porto S também se espalharam pelas três classes. Quanto aos que embarcaram no porto Q, esses foram basicamente para a terceira classe. Portanto, essas variáveis não parecem estar fortemente associadas.
+
+    2.Fare (Valor da Tarifa) vs pclass (Classe da Viagem)
+
+Parece lógico que os passageiros que pagaram as maiores tarifas foram para as primeiras classes, do contrário, haveria conflito de informações. Então, precisamos averiguar de que formas elas estão associadas.
+
+```{r}
+boxplot(df$fare~df$pclass, ylab = "Valor da Tarifa", xlab="Classe",main="")
+```
+
+Verifica-se que, em geral, os que **pagaram mais** estão na **primeira classe**, mas há considerável confusão entre as classes quando os valores das tarifas são baixos.
+
+Há, inclusive, observações que são incoerentes. Por exemplo: por que 8 passageiros da terceira classe pagaram quase 60 valores, sendo que mais de 50 passageiros pagaram menos da metade e foram para a primeira classe? Como não há como verificar se os valores estão incorretos e considerando que são poucas observações, podemos excluir da base essas observações ou simplesmente ignorarmos essas aparentes incoerências.
+
+    3. Variáveis quantitativas
+
+As variáveis quantitativas podem ser analisadas em termos de covariâncias e correlações lineares, inclusive as variáveis **sibsp** e **parch** que, embora discretas, possuem poucos valores diferentes. Iremos apresentar a matriz de correlações entre as variáveis.
+
+```{r}
+quant<-data.frame(subset(df, select = c(age, parch, sibsp,fare)))
+quant<-quant[complete.cases(quant),]
+quant.cor<-cor(quant)
+#Para a visualização:
+library(corrplot)
+corrplot(quant.cor)
+```
+
+Vemos, portanto, que as correlações lineares entre as variáveis são baixas. Porém, como nem sempre a associação é linear, vamos analisar os gráficos de dispersão:
+
+```{r}
+layout(matrix(c(1,2,3,4),ncol=2))
+plot(quant$age~quant$fare, xlab="Tarifa", ylab="Idade", main="")
+abline(lm(quant$age~quant$fare), col="red", lty=1, lwd=2)
+plot(quant$sibsp~quant$parch, xlab="Número filhos", ylab="Número de irmãos", main="")
+abline(lm(quant$sibsp~quant$parch), col="red", lty=1, lwd=2)
+plot(quant$age~quant$parch, xlab="Número filhos", ylab="Idade", main="")
+abline(lm(quant$age~quant$parch), col="red", lty=1, lwd=2)
+plot(quant$sibsp~quant$fare, xlab="Tarifa", ylab="Número irmãos", main="")
+abline(lm(quant$sibsp~quant$fare), col="red", lty=1, lwd=2)
+```
+
+Diante do exposto, percebemos que não há forte associação entre as variáveis explicativas analisadas nesta e nas outras seções.
+
+Antes de passarmos para o capítulo de Inferência Estatística, vamos construir algumas variáveis ("Feature engineering", em inglês) e propor alguns agrupamentos que poderão ser utilizados no decorrer deste trabalho, esses também são propósitos da Análise Descritiva.
+
+## Construções de variáveis e sugestões de agrupamentos
+
+    1. Tamanho da Família
+    
+Vimos que as variáveis **sibsp** e **parch** parecem ajudar a explicar o comportamento da variável resposta. Contudo, percebemos que a maioria dos seus valores estão próximos de zero. Considerando também que essas variáveis não estão fortemente correlacionadas, propomos nesta seção alguns agrupamentos para **sibsp** e **parch** e a criação de novas variáveis.
+
+```{r}
+calc_sibsp_agg<-function(sibsp=NA){
+  if(sibsp<1) return("1.Sem irmãos")
+  else if(sibsp<3) return("2.Tem 1 ou 2 irmãos")
+  else return("3.Tem 3 ou mais irmãos")
+}
+
+df["sibsp_agg"]<-sapply(df$sibsp,FUN=calc_sibsp_agg)
+
+calc_parch_agg<-function(parch=NA){
+  if(parch<1) return("1.Sem filhos")
+  else if(parch<4) return("2.Tem até 3 filhos")
+  else return("3.Tem 4 ou mais filhos")
+}
+
+df["parch_agg"]<-sapply(df$parch,FUN=calc_parch_agg)
+```
+
+Para obter o tamanho da família, basta somar 1 (o próprio passageiro), **sibsp** e **parch**, da seguinte forma:
+
+```{r}
+df["tamanho_familia"]<-df$sibsp+df$parch+1
+```
+
+Então, caso o tamanho da família seja igual a 1, significa que o passageiro embarcou sozinho, ou seja, sem pais, filhos, irmãos ou esposos.
+
+```{r}
+sozinho<-function(fam=1) ifelse(fam==1, 1, 0)
+
+df["sozinho"]<-sapply(df$tamanho_familia,FUN=sozinho)
+
+barplot(table(df$survived,df$sozinho), xlab="Sozinho(SIM=1)", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Pela observação do gráfico, percebemos que os passageiros que embarcaram sozinho tiveram uma proporção **menor** de sobreviventes. Então podemos considerar a utilização desta variável na modelagem (também podemos testar os outros agrupamentos propostos neste trabalho).
+
+    2.Idade
+    
+De acordo com o observado na Análise Descritiva, parece razoável agrupar a idade em três conglomerados: 1.Crianças e jovens; 2.Adultos; 3.Sem idade informada. Para essa nova variável (faixa_etaria) considere o seguinte código:
+
+```{r}
+calc_faixa_etaria<-function(idade=NA){
+  if(is.na(idade)){
+    faixa_etaria = "3.Sem idade"
+    return(faixa_etaria)
+  }else if(idade<=15){
+    faixa_etaria = "1.Crianças e jovens"
+    return(faixa_etaria)
+  } else{
+    faixa_etaria = "2.Adultos"
+    return(faixa_etaria)
+  }
+}
+
+df["faixa_etaria"]<-sapply(df$age,FUN=calc_faixa_etaria)
+```
+
+```{r, echo=TRUE}
+label.pie<-c("Crianças","Adultos", "Sem idade")
+freq<-round(table(df$faixa_etaria)/nrow(df)*100,2)
+label.pie<-paste(label.pie,freq)
+label.pie<-paste(label.pie,"%",sep="")
+
+pie(x=table(df$faixa_etaria), labels=label.pie)
+barplot(table(df$survived,df$faixa_etaria), xlab="Sobrevivência por Faixa Etária", ylab="Frequência",
+        legend.text = TRUE, beside=FALSE)
+```
+
+Como dito, as **crianças** possuem uma **maior** proporção de sobreviventes, seguido dos adultos que sabemos a idade e com a **menor** proporção de sobreviventes estão os passageiros sem idade informada.
+
+Vale dizer, ainda, que às vezes poderemos obter um agrupamento ainda melhor por meio de outras técnicas, por exemplo, através de um modelo de Árvores de Decisão.
+
+Outra forma de trabalharmos com os valores faltantes da idade é preenchendo-os com alguma medida de centralidade.
+
+```{r}
+df["age_2"] = df$age
+df$age_2[is.na(df$age_2)]<-mean(df$age_2,na.rm = TRUE)
+```
+
+    3.Valor da Tarifa
+
+Observando os gráficos e a tabela resumo (summary) da variável **fare**, vimos que há apenas 1 valor faltante e que há alguns outliers que distorcem a escala e, inclusive, podem comprometer a qualidade do modelo. Com efeito, 75% dos valores (do mínimo até o 3° quartil) são inferiores a 32, enquanto há valores que ultrapassam 512!
+
+Vale adiantar, uma das técnicas do KNN é normalizar as variáveis para que todas exerçam a mesma influência no cálculo das distâncias. Porém, mesmo esta técnica é ineficaz com outliers. Para ilustrarmos nossa assertiva, considere o seguinte exemplo:
+
+Suponha que temos 3 variáveis explicativas:
+"a"= [1,1,1,2,2,2,3,3,3,4,4,4,5,5,5],
+"b"= [10000,10000,10000,20000,20000, 20000,30000,30000,30000,40000,40000,40000,50000,50000, 50000]
+"c" = [1,1,1,2,2,2,3,3,3,4,4,4,5,5,500]
+Sem a normalização, qualquer variação de "a" ou "c" será irrelevante se comparadas com uma variação "b".
+Normalização de uma variável "x"= (obs(x)-min(x))/(max(x)-min(x))
+
+"a_norm" = [0,0,0,0.25,0.25,0.25,0.50,0.50,0.50,0.75,0.75,0.75,1,1,1]
+"b_norm" = [0,0,0,0.25,0.25,0.25,0.50,0.50,0.50,0.75,0.75,0.75,1,1,1] = "a_norm"
+"c_norm" = [0,0,0.002,0.002,0.002,0.004,0.004,0.004,0.006,0.006,0.006,0.008, 0.008, 1]
+
+Ou seja, mesmo após a normalização, as variações de "c" continuarão irrelevantes se comparadas às das outras variáveis, pois apenas um outlier conseguiu deixar os outros valores de "c" muito próximos a 0.
+
+Então, para contornar esse problema, podemos:
+
++ 1. categorizar a variável, por exemplo, construindo uma variável chamada **"fare_agg"**;
+
++ 2. agrupar apenas os valores extremos, por exemplo, deixar igual a 100 todos os valores iguais ou superiores a 100;
+
++ 3. excluir da modelagem os valores extremos.
+
+Para o procedimento 1, faremos utilizando técnicas de Árvores de Decisão. Para o 2, iremos construir uma variável **fare_2**. No tocante ao procedimento 3, poderemos testar isso nas modelagens.
+
+## Inferência Estatística.
+
+Nesta seção, apresentaremos uma estimativa pontual e um intervalo de confiança para a proporção de passageiros sobreviventes ao acidente. Além disso, durante a Análise Descritiva, percebemos que algumas variáveis parecem ajudar a explicar o comportamento da variável resposta. Portanto, verificaremos se as diferenças acima encontradas são significativas (ou não) usando técnicas inferenciais.
+
+    1. Estimação Pontual e Intervalar para a proporção de passageiros sobreviventes.
+
+Seja Y uma variável aleatória que representa a sobrevivência de um passageiro, Y pode assumir 2 valores: 1 (sucesso) se o passageiro sobreviveu ao acidente e 0 (fracasso) em caso contrário. Neste caso, estaríamos interessados em descobrir qual é a proporção de sucessos(p). Então Y ~ Bernoulli(p), sendo p o valor do parâmetro que queremos obter.
+
+Assim, supondo que uma sucessão (Yn) seja independente e identicamente distribuída, temos que a soma S = Y1 + Y2 + ... Yn tem uma distribuição Binomial (S ~ Bin(n,p)). Além disso, considerando que n é grande, podemos usar o TLC (Teorema do Limite Central) e aproximar a distribuição da soma S por uma distribuição Normal com média np e variância np(1-p).
+
+Deste modo, como nossa amostra y = (y1, y2, ...., y1309) é uma realização particular de Y = (Y1, Y2, ...., Y1309), o p que queremos encontrar pode ser estimado da seguinte forma:
+p_est = S/n ~ N(p,p(1-p)/n), em que S = quantidade total de sobreviventes na amostra (soma das Yn) e n é o tamanho da amostra.
+
+```{r}
+p_est<- table(df$survived)[2]/nrow(df)
+sd <- sqrt(p_est*(1-p_est)/nrow(df))
+LI <- p_est - qnorm(0.975)*sd
+LS <- p_est + qnorm(0.975)*sd
+
+#Forma utilizando funções do R: binom.test
+binom.test(table(df$survived)[2],nrow(df))
+#Diferença bem pequena. Aqui é usada a distribuição Binomial, enquanto que o intervalo acima foi obtido pela normal 
+```
+
+Logo, p_est = 500/1309 aprox.= 0,382 (Estimativa Pontual). Adotando o grau de confiança de 95%, temos o intervalo de confiança IC = [LI;LS] = [0,356 ; 0,408].  
+
+De acordo com o site da Wikipédia, a embarcação possuiu 2224 pessoas (passageiros e tripulantes) e o número total de mortes estimado está entre 1490 e 1635, ou seja, a proporção de sobreviventes estaria entre [0,265 ; 0,330]. Percebe-se, assim, que a interseção dos intervalos é vazia.
+
+Diante do exposto, podemos formular e testar as seguintes hipóteses: H0: a proporção de sobreviventes é de 0,33 (máximo do intervalo da Wikipédia) vs H1: a proporção de sobreviventes é superior a 0,33. Este teste é unilateral à direita (H0: p = 0,33 vs H1: p > 0,33). Vale dizer, poderíamos fazer um teste bilateral (H0: p = 0,33 vs H1: p != 0,33), mas neste caso poderia ser respondido pelo próprio intervalo de confiança que construímos e, assim, rejeitaríamos H0 ao nível de significância de 5%.
+
+```{r}
+prop.test(x=500,n=1309,p=0.33,alternative = "greater",conf.level = 0.95)
+```
+
+Portanto, considerando um nível de significância de 5%, rejeitamos H0, ou seja, há evidências significativas que a proporção de sobreviventes é superior a 0.33.
+
+Cabe ressaltar, porém, que os valores apresentados no site não se referem apenas aos passageiros, mas também aos tripulantes. Então, pode ser que a proporção de sobreviventes dos tripulantes foi menor, o que diminuiu a proporção de sobreviventes total. Outra possibilidade é que os poucos passageiros que não fizeram parte da amostra também fizeram com que a proporção de sobreviventes real diminuísse.
+
+    2. Verificação das diferenças nas proporções de sobreviventes nas variáveis explicativas.
+
+    2.1 Sexo (sex)
+
+Vimos que as mulheres pareciam ter uma proporção de sobreviventes superior à dos homens. Para verificar nossa assertiva, podemos fazer um teste de hipóteses, em que H0: p_mulheres = p_homens vs H1: p_mulheres != p_homens. Outra forma de verificar isso seria construir um intervalo de confiança para a diferença das proporções e se esse intervalo contiver o valor zero, significaria que não poderíamos rejeitar H0, ou seja, não teríamos evidência de que a diferença das proporções é significativa. Utilizaremos neste (e em todos os outros) um nível de significância de 5% (teste de hipóteses) e 95% de confiança (intervalos de confiança).
+
+```{r}
+p_xx<-table(df$survived,df$sex)[2,1]/table(df$sex)[1]
+p_xy<-table(df$survived,df$sex)[2,2]/table(df$sex)[2]  
+
+se <- sqrt(p_xx*(1-p_xx)/table(df$sex)[1] + p_xy*(1-p_xy)/table(df$sex)[2]) 
+p_xx-p_xy+c(-1,1)*qnorm(0.975)*se
+
+#Outra forma (utilizando uma função do R):
+#prop.test
+prop.test(x=c(table(df$survived,df$sex)[2,1],table(df$survived,df$sex)[2,2]),n=c(table(df$sex)[1],table(df$sex)[2]))
+
+#Podemos testar, também, se p_xx é maior que p_xy 
+prop.test(x=c(table(df$survived,df$sex)[2,1],table(df$survived,df$sex)[2,2]),n=c(table(df$sex)[1],table(df$sex)[2]), alternative = "greater")
+```
+
+Obtemos, portanto, o intervalo de confiança (0,4881 ; 0,5848). Como não contém o valor zero, rejeitamos a hipótese nula (proporções de sobreviventes iguais). Pela hipótese alternativa, concluímos que a proporção de sobreviventes das mulheres é **maior** que a dos homens.
+
+    2.2 Classe que Embarcou (pclass)
+    
+Também percebemos que as pessoas que viajaram na primeira classe tiveram uma proporção **maior** de sobreviventes ( **61,92%** contra **25,53%** dos que viajaram na terceira classe). Podemos fazer o teste: H0: p1=p2=p3 vs H1: há alguma diferença entre as proporções. Porém, é mais interessante fazer dois testes: primeiro verificar se p1=p2 (alternativa p1>p2) e depois verificar se p2=p3(alternativa p2>p3).
+
+```{r}
+#H1: p_1 é maior que p_2? 
+prop.test(x=c(table(df$survived,df$pclass)[2,1],table(df$survived,df$pclass)[2,2]),n=c(table(df$pclass)[1],table(df$pclass)[2]), alternative = "greater")
+```
+
+Portanto, ao nível de significância de 5%, rejeita-se H0, ou seja, rejeitamos que as proporções de sobreviventes nas classes 1 e 2 sejam iguais.
+
+```{r}
+#H1: p_2 é maior que p_3? 
+prop.test(x=c(table(df$survived,df$pclass)[2,2],table(df$survived,df$pclass)[2,3]),n=c(table(df$pclass)[2],table(df$pclass)[3]), alternative = "greater")
+```
+
+Portanto, ao nível de significância de 5%, rejeita-se H0, ou seja, rejeitamos que as proporções de sobreviventes nas classes 2 e 3 sejam iguais.
+
+    2.3 Porto em que Embarcou (embarked)
+
+Pessoas que embarcaram no porto "C" (Cherbourg) também possuíram uma proporção **maior** de sobreviventes (**55,56%** contra **33,56%** nos outros portos). Vale dizer, o tamanho expressivo da amostra facilita a rejeição de H0 (observe os valores-p dos outros testes, quase todos foram praticamente zero). Aqui, porém, pode ser que não rejeitemos que as proporções dos portos "Q" e "S" sejam iguais.
+
+```{r}
+#H1: p_Q é igual a p_S? - Teste bilateral
+prop.test(x=c(table(df$survived,df$embarked)[2,3],table(df$survived,df$embarked)[2,4]),n=c(table(df$embarked)[3],table(df$embarked)[4]), alternative = "two.sided")
+```
+
+Portanto, **não** rejeitamos H0 ao nível de significância de 5%, ou seja, não descartamos a hipótese de que as proporções dos Portos "Q" e "S" são iguais. Como desencargo de consciência, vamos testar se a proporção de sobreviventes no porto C é maior que a de Q.
+
+```{r}
+#H1: p_C é superior a p_Q? - Teste unilateral
+prop.test(x=c(table(df$survived,df$embarked)[2,2],table(df$survived,df$embarked)[2,3]),n=c(table(df$embarked)[2],table(df$embarked)[3]), alternative = "greater")
+```
+
+    2.4 Idade (age)
+
+Através da idade, percebemos que as **crianças e jovens** tiveram uma proporção **maior** de sobreviventes. Além disso, dividimos os passageiros em três grupos: **"1.Crianças e jovens**; **2.Adultos** e **3.Sem idade**. Para essa nova variável (faixa_etaria) considere os seguintes testes:
+
+```{r}
+#H1: p_Crianças é superior a p_Adultos? - Teste unilateral
+prop.test(x=c(table(df$survived,df$faixa_etaria)[2,1],table(df$survived,df$faixa_etaria)[2,2]),n=c(table(df$faixa_etaria)[1],table(df$faixa_etaria)[2]), alternative = "greater")
+```
+
+Portanto, rejeitamos H0 ao nível de significância de 5%, ou seja, a proporção de sobreviventes das crianças é diferente (e maior) que a dos adultos com idade informada. Para testar se proporções de sobreviventes dos adultos é igual a dos passageiros sem idade informada, verifique o seguinte teste:
+
+```{r}
+#H1: p_Adultos_idade é superior a p_sem_idade? - Teste unilateral
+prop.test(x=c(table(df$survived,df$faixa_etaria)[2,2],table(df$survived,df$faixa_etaria)[2,3]),n=c(table(df$faixa_etaria)[2],table(df$faixa_etaria)[3]), alternative = "greater")
+```
+
+Os outros testes podem ser feitos de forma semelhante à que apresentamos aqui. Então, para não ficar repetitivo, deixemos a cargo do leitor.
+    
+## Modelagem.
+
+Como vimos, a variável resposta é dicotômica e os modelos mais adequados para sua previsão são os de classificação supervisionados.
+
+Primeiro iremos apresentar 3 modelos: **Árvore de Decisão (Simples)**, **Regressão Logística** e o **KNN**. Depois, vamos tentar aumentar a acurácia da previsão, refinando os modelos com algumas técnicas. Para evitarmos o chamado **overfitting**, vamos construir os modelos utilizando uma parte da amostra e com outra parte vamos validar os resultados. Geralmente, é utilizado 70% da amostra para modelagem (ou treinamento) e os outros 30% são destinados à validação.
+
+    1. Pré-processamento
+
+Antes de construirmos os modelos, precisamos fazer alguns pré-processamentos, como criar labels para as variáveis categóricas, tratar os valores faltantes e dividir a amostra em treino e teste (já mencionado). Quando aplicar o KNN, precisamos de pré-processamentos adicionais, mas para não ficar confusas as bases, faremos as devidas alterações na seção do KNN.
+
+```{r}
+#Categorizando as variáveis criadas
+df$faixa_etaria<-factor(df$faixa_etaria)
+df$sozinho<-factor(df$sozinho)
+df$sibsp_agg<-factor(df$sibsp_agg)
+df$parch_agg<-factor(df$parch_agg)
+
+#Tratando os valores faltantes
+#Temos apenas 1 obs na fare e 2 na embarked. Idade já resolvida com age_2 e/ou faixa_etaria
+df$fare[is.na(df$fare)]<-mean(df$fare,na.rm = TRUE)
+df$embarked[df$embarked==""]<-"S" #classe mais frequente
+df$embarked<-factor(df$embarked) #necessária a refactorização, pois o vazio "" virou uma categoria.
+```
+
+Para fazer a divisão em treino e teste, poderíamos usar um pacote (por exemplo, "caTools"). Porém, em vez de instalarmos um pacote, podemos simplesmente gerar números aleatórios, conforme se verifica abaixo:
+
+```{r}
+set.seed(17) #Para manter a mesma sequência pseudo-aleatória
+sample<-sort(sample(nrow(df),nrow(df)*0.7))
+train<-df[sample,]
+val<-df[-sample,]
+```
+
+    2. Árvore de Decisão Simples
+
+O modelo de Árvore de Decisão é de fácil interpretação e lida muito bem com diversos tipos de variáveis (a variável resposta, por exemplo, pode ser qualitativa ou quantitativa), também lida bem com valores faltantes e não requer pré-processamentos (embora manteremos os feitos na seção anterior).
+
+Além disso, ele pode ser usado como ponto de partida para outros modelos, por isso será apresentado primeiro. Vale dizer, ainda, que podemos aplicar a técnica de Random Forest e melhorar ainda mais a performance do modelo, pese o fato de ficar um pouco menos interpretativo.
+
+O ponto negativo da Árvore de Decisão é não conseguirmos controlar bem o número de folhas produzidas. Até podemos especificar quantos entroncamentos queremos, mas às vezes com tamanho "n" o modelo fica "underfit" e com "n+1" já fica "overfit". Para exemplificar nossa assertiva, é possível construir uma árvore que dê acurácia de 100% para a base de treinamento, mas obviamente nesses casos o modelo costuma ir muito mal na base de validação (e, consequentemente, nas futuras previsões que tenhamos que fazer na prática).
+
+Para construir um modelo de Árvore de Decisão, precisamos importar as bibliotecas rpart e rpart.plot. Após isto, já construiremos uma árvore.
+
+```{r}
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+tree<-rpart(survived ~., data=train)
+prp(tree)
+```
+
+Basta olharmos a figura acima que rapidamente entendemos quais variáveis foram utilizadas na construção do modelo e sua importância. A primeira foi **sex**, sendo auxiliada pelas variáveis **age_2** (o algoritmo preferiu nossa transformação na variável **age** original) e **pclass**, a qual foi auxiliada pela variável **fare**. Ao percorrermos um caminho da árvore, percebemos qual foi a previsão do modelo para um passageiro com as características do caminho. Por exemplo, homens com menos de 6,5 anos e que possuíam menos de 3 irmãos foram classificados como sobreviventes.
+
+Aplicando este modelo na base de validação, obtemos os seguintes resultados:
+
+```{r}
+pred_tree<-predict(tree, val, type="class")
+acc<-sum(table(pred_tree,val$survived)[1,1],table(pred_tree,val$survived)[2,2])/length(pred_tree)
+print(acc)
+```
+
+Temos, portanto, uma acurácia de **78,12%**. Quanto à matriz de confusão, observe a seguinte matriz:
+
+```{r}
+table(pred_tree,real=val$survived)
+```
+
+Além da acurácia total, temos a acurácia de **89,83%** (212/236) para os que faleceram e a de **60,51%** (95/157) para os sobreviventes, ou seja, o modelo é pior para classificar os sobreviventes.
+
+Como prometido, vamos agrupar a variável **fare** utilizando uma Árvore de Decisão. Este agrupamento poderá ser utilizado nos próximos modelos. Como estamos apenas obtendo um agrupamento para uma variável, não tem problema usarmos toda a amostra.    
+
+```{r}
+fare_agg<-rpart(survived ~fare, data=df)
+prp(fare_agg)
+```
+
+Pelo desenho, vemos os seguintes pontos de cortes:
+
+```{r}
+calc_fare_agg<-function(fare=NA){
+  if(fare<15) return("1.Fare_1")
+  else if(fare<35) return("2.Fare_2")
+  else if(fare<52) return("3.Fare_3")
+  else if(fare<76) return("4.Fare_4")
+  else return("5.Fare_5")
+}
+df["fare_agg"]<-sapply(df$fare,FUN=calc_fare_agg)
+df$fare_agg<-factor(df$fare_agg)
+```
+
+Vamos fazer gráficos para ver se este agrupamento faz sentido. Então, considere:
+
+```{r}
+label.pie<-c("1F","2F", "3F", "4F", "5F")
+freq<-round(table(df$fare_agg)/nrow(df)*100,2)
+label.pie<-paste(label.pie,freq)
+label.pie<-paste(label.pie,"%",sep="")
+pie(x=table(df$fare_agg), labels=label.pie)
+```
+
+```{r}
+barplot(table(df$survived,df$fare_agg), xlab="Sobrevivência por Valor Agrupado da Tarifa", ylab="Frequência",
+        legend.text = TRUE, beside=TRUE)
+```
+
+Portanto, este agrupamento tem representatividade nas categorias e ainda manteve o verificado na Análise Descritiva, pois os passageiros nos grupos que pagaram mais tiveram maior proporção de sobreviventes. Além disso, vamos usar o valor 76 como sendo o máximo permitido para a variável **fare_2**.
+
+```{r}
+max_fare<-function(fare=0) ifelse(fare<76, fare, 76)
+df["fare_2"]<-sapply(df$fare,FUN=max_fare)
+```
+
+    3. Regressão Logística
+
+Para construirmos um modelo de regressão logística, podemos utilizar a função glm. Para a primeira versão do modelo, utilizaremos as variáveis originais, exceto pela **age**, pois não podemos ter valores faltantes na Regressão Logística.
+
+```{r}
+df_reg<-subset(df, select=-c(fare_2, age, fare_agg, sozinho, tamanho_familia,
+                     sibsp_agg, parch_agg, faixa_etaria))
+train<-df_reg[sample,]
+val<-df_reg[-sample,]
+m1<-glm(formula = survived ~ ., data = train, family="binomial")
+summary(m1)
+```
+
+Com o resultado do primeiro modelo, percebemos que as variáveis fare, embarkedQ e parch foram rejeitadas. Considerando que não rejeitamos no capítulo de Inferência que a proporção de quem embarcou no porto Q era igual aos que embarcaram no porto S, faremos essa modificação. Contudo, chamaremos de "embarked_agg" para não danificarmos a variável original.
+
+```{r}
+df["embarked_agg"]<-df$embarked
+df$embarked_agg[df$embarked_agg=="Q"]<-"S"
+df$embarked_agg<-factor(df$embarked_agg)
+
+df_reg<-subset(df, select=-c(fare_2, age, fare_agg, sozinho, tamanho_familia, sibsp_agg, parch_agg, faixa_etaria))
+train<-df_reg[sample,]
+val<-df_reg[-sample,]
+
+train<-subset(train, select=-c(fare,parch,embarked))
+m2<-glm(formula = survived ~ ., data = train, family="binomial")
+summary(m2)
+```
+
+Como nenhuma variável foi rejeitada (todos os betas são significamente diferentes de zero), veremos agora se os coeficientes estão coerentes com o que seria esperado. Podemos ver, por exemplo, que a medida que piora a classe de embarque, diminui a probabilidade de sobrevivência (coeficientes estão negativos e "punem" cada vez mais). Além disso, vemos que os resíduos estão bem distribuídos e em torno do zero. Quanto ao AIC, obtivemos o valor de 853,56. 
+
+Contudo, há um pequeno conflito na variável **sibsp**, pois com 1 ou 2 irmãos, a proporção de sobreviventes é maior que a de 0, mas o sinal do coeficiente é negativo (com 3 ou mais o valor precisava ser negativo mesmo). Porém, provavelmente a variável **sozinho** vai contornar essa conflito, "punindo" quem está com **sibsp** igual a 0.
+
+Antes de tentarmos melhorar a performance do modelo, vamos apresentar a acurácia e a matriz de confusão da base de validação.
+
+```{r}
+res<-predict(m2,val,type="response")
+confmatrix<-table(pred=res>0.5, verd=val$survived)
+acc<-(confmatrix[1,1]+confmatrix[2,2])/sum(confmatrix)
+print(acc)
+confmatrix
+```
+
+Portanto temos a acurácia total de **78,12%**, de **84,32%** (199/236) para os que faleceram e de **68,79%** (108/157) para os que sobreviveram.
+
+Cabe observar, ainda, que obtivemos a mesma acurácia que a do modelo de Árvore de Decisão, tendo a vantagem do modelo de Regressão Logística estar mais equilibrado na acurácia dos sobreviventes e dos não sobreviventes.
+
+Fazendo modelos com as novas variáveis, só conseguimos melhora com a variável **sozinho**. Com ela, a acurácia total foi de **78,62%**. Observemos o resultado:
+
+```{r}
+train<-df[sample,]
+val<-df[-sample,]
+train<-subset(train, select=-c(age,fare,parch,embarked, tamanho_familia,
+                               fare_agg,fare_2, faixa_etaria, parch_agg, sibsp_agg))
+mf<-glm(formula = survived ~ ., data = train, family="binomial")
+summary(mf)
+res<-predict(mf,val,type="response")
+confmatrix<-table(pred_log=res>0.5, verd=val$survived)
+acc<-(confmatrix[1,1]+confmatrix[2,2])/sum(confmatrix)
+print(acc)
+```
+
+Os resíduos deste modelo continuam bem distribuídos em torno do zero, os coeficientes estão coerentes com o esperado e ainda diminuímos o AIC, então este modelo foi o melhor que conseguimos construir com as variáveis que temos à disposição.
+
+```{r}
+print(confmatrix)
+```
+
+Percebe-se que o modelo acerta **83,90%** (198/236) dos passageiros que não sobreviveram e acerta **70,70%** (111/157) dos que sobreviveram. Logo, em termos de acurácia e equilíbrio nos acertos de 0 e 1, o modelo de **Regressão Logística é melhor que o de Árvore de Decisão**. 
+
+    4.KNN
+
+A ideia do KNN é classificar um novo elemento observando os k elementos mais próximos, sendo k um valor que chamamos de hiperparâmetro do modelo. Não existe uma fórmula para se obter k, geralmente são utilizados números ímpares para evitar empates. Obteremos esse valor treinando o algoritmo iterativamente e verificando qual apresentou a maior acurácia. 
+
+Outro problema que o KNN enfrenta é que a variável resposta precisa ser equilibrada, do contrário, fica difícil para a categoria com pouca representatividade "vencer na votação". No caso em tela, temos que a proporção de sobreviventes é de 0,382, temos, então, um desbalanceamento considerável.
+
+Precisamos que todas as variáveis explicativas sejam numéricas. Então, precisaremos fazer pré-processamentos adicionais. Além disso, assim como na Regressão Logística, vamos trabalhar primeiro com as variáveis originais (novamente não podemos utilizar a **age**).
+
+```{r}
+library(caret)
+target<-subset(df, select=survived)
+df_knn<-subset(df, select=-c(fare_2, age, sozinho, fare_agg, tamanho_familia, sibsp_agg, parch_agg, faixa_etaria, survived, embarked_agg))
+dummy<-dummyVars(" ~. ", data=df_knn)
+df_knn<-data.frame(predict(dummy,newdata=df_knn))
+```
+
+Explicamos que as variáveis precisam ser normalizadas. Então considere o seguinte código:
+
+```{r}
+normalize<-function(x) return((x-min(x))/(max(x)-min(x)))
+#Aplicando a normalização na base:
+df_norm<-as.data.frame(lapply(df_knn, normalize))
+X_train<-df_norm[sample,] #seed(17) já foi fixado
+X_val<-df_norm[-sample,]
+y_train<-target[sample,]
+y_val<-target[-sample,]
+```
+
+Para exemplificarmos o funcionamento do algoritmo, criaremos um com k=3 (poderíamos ter escolhido outro valor).
+
+```{r}
+require(class)
+m1<-knn(train = X_train, test = X_val, cl=y_train, k=3)
+acc<-sum(table(m1,y_val)[1,1],table(m1,y_val)[2,2])/length(y_val)
+print(acc)
+```
+
+Portanto, já na primeira tentativa, conseguimos uma acurácia superior às obtidas nos outros modelos. Passemos, agora, a obter um valor melhor de k.
+
+```{r}
+l_acc<-c()#inicializando o vetor de acc
+for( i in 1:41){
+  m1<-knn(train = X_train, test = X_val, cl=y_train, k=i)
+  acc<-sum(table(m1,y_val)[1,1],table(m1,y_val)[2,2])/length(y_val)
+  l_acc<-append(l_acc,acc)
+}
+
+cat('Para k = ',which.max(l_acc)," temos acc = ",max(l_acc))
+```
+
+Portanto, o melhor valor de k para a base de validação é **k=15** com uma acurácia de **80,15%**. O gráfico a seguir mostra o acc de todos os k gerados:
+
+```{r}
+plot(l_acc,xaxt="n")
+axis(1,at=1:40)
+abline(v=15,col="green")
+```
+
+De forma análoga ao que fizemos na regressão logística, vamos verificar se podemos melhorar este modelo.
+
+Ao testar novas combinações, percebemos que com a **fare_2** o modelo ficou melhor que o que usava **fare** (lembrar que outlier pode invalidar uma variável). Então observe o modelo final de KNN:
+
+```{r}
+df_knn<-subset(df, select=-c( age, sozinho, fare_agg, tamanho_familia,parch_agg, sibsp_agg, embarked_agg,
+                             survived, fare,faixa_etaria))
+dummy<-dummyVars(" ~. ", data=df_knn)
+df_knn<-data.frame(predict(dummy,newdata=df_knn))
+
+df_norm<-as.data.frame(lapply(df_knn, normalize))
+X_train<-df_norm[sample,]
+X_val<-df_norm[-sample,]
+y_train<-target[sample,]
+y_val<-target[-sample,]
+
+l_acc<-c()#inicializando o vetor de acc
+for( i in 1:41){
+  m1<-knn(train = X_train, test = X_val, cl=y_train, k=i)
+  acc<-sum(table(m1,y_val)[1,1],table(m1,y_val)[2,2])/length(y_val)
+  l_acc<-append(l_acc,acc)
+}
+
+cat('Para k = ',which.max(l_acc)," temos acc = ",max(l_acc))
+
+```
+
+Com k=15, obtivemos uma acurácia total de **81,17%**, de **92,37%** (218/236) para os que faleceram e de **64,33%** (101/157) para os sobreviventes. Se não, vejamos:
+
+```{r}
+knn_final<-knn(train = X_train, test = X_val, cl=y_train, k=15)
+  acc<-sum(table(knn_final,y_val)[1,1],table(knn_final,y_val)[2,2])/length(y_val)
+  print(acc)
+  table(knn_final,y_val)
+```
+
+    5.Escolha do melhor modelo
+
+Podemos escolher qual modelo vamos aplicar na vida real com base em diversos critérios como, por exemplo, performance, interpretabilidade, tempo decorrido até a previsão, etc...
+
+Ao invés de escolher o melhor modelo, podemos utilizar todas as previsões e escolher a mais frequente. Por exemplo, suponha que para um determinado passageiro teríamos que o modelo de KNN e o de Regressão Logística classificaram o passageiro como sobrevivente e o de Árvore de Decisão o classificou como não-sobrevivente. Nessa caso, teríamos que a previsão seria igual a 1 (passageiro sobreviveu). Aliás, fizemos 3 modelos no decorrer deste trabalho justamente para mostrarmos esta técnica. Então, considere o seguinte código:
+
+```{r}
+val<-df[-sample,]
+val["p_arvore"]<-as.numeric(pred_tree)-1
+val["pred_log"]<-ifelse(res>0.5,1,0)
+val["p_knn"]<-as.numeric(knn_final)
+val["p_voto"]<-ifelse(val$p_arvore+val$pred_log+val$p_knn>1,1,0)
+acc_voto<-(table(val$p_voto, val$survived)[1,1]+table(val$p_voto, val$survived)[2,2])/nrow(val)
+table(pred=val$p_voto, real=val$survived)
+```
+
+Percebemos que a acurácia total foi de **79,13%** (311/393), para os que faleceram foi de **83,05%** (196/236) e de **73,25%** (115/157) para os sobreviventes. Portanto, embora a acurácia total seja inferior a de **81,17%** obtida pelo KNN, o modelo de votação ficou mais equilibrado.
+
+Mostramos que para todos os modelos era possível aumentar sua performance, fazendo transformações de algumas variáveis, criando outras variáveis, usando outros tipos de métodos do modelo. Por exemplo, no KNN é usada a distância euclidiana, talvez se usássemos a distância de Manhattan fosse melhor, ou se aplicássemos antes técnicas de componentes principais, "boosting", "bagging", etc... Porém, por outro lado, sempre estamos correndo o risco de cometer **overfitting** e, após tanto trabalho, o modelo não funcionaria na prática.
+
+Quanto aos modelos apresentados neste trabalho, vimos que todos tinham vantagens e desvantagens. Se optássemos por praticidade e interpretabilidade, o obtido por Árvores de Decisão seria o mais adequado. Caso déssemos preferência para uma maior acurácia dos sobreviventes, escolheríamos o obtido pela Regressão Logística (ou pelo método de votação). Se quisessemos a maior acurácia, escolheríamos o KNN com k=15.
+
+## Conclusões.
+
+Por meio da base do Titanic, conseguimos aprender ainda mais sobre o acidente histórico que ocorreu há pouco mais de 100 anos. De fato, vimos que o **gênero feminino, as crianças e os que pagaram maiores tarifas, embarcaram no porto C e na primeira classe** tiveram **maior** proporção de sobreviventes.
+
+Também extrapolamos os resultados obtidos na amostra para a população, constituída pelo conjunto de passageiros que embarcaram no Titanic, obtendo o Intervalo de Confiança [0,356 ; 0,408] e a estimativa pontual de **0,382**.
+
+Por fim, apresentamos um modelo de Regressão Logística que apresentou uma acurácia total de **78,62%**, um de Árvore de Decisão que também apresentou uma acurácia de **78,12%** e um modelo de KNN com k=15, que apresentou uma acurácia de **81,17%**, sendo esses valores excelentes, principalmente quando consideramos que a base não apresenta muitas variáveis explicativas.
+
+## Agradecimentos.
+
+Este trabalho foi concebido majoritariamente com os conhecimentos adquiridos nos dois primeiros meses do curso de Mestrado de Estatística para Ciências de Dados da Universidade do Minho.
+
+De fato, para a Análise Descritiva Univariada, muito do conhecimento foi obtido na matéria de Fundamentos e Aplicações de Estatística. No capítulo de Inferência Estatística, todos os testes e códigos do R lá utilizados foram aprendidos na cadeira de mesmo nome. A análise dos "betas" de cada variável foi ensinada na matéria de Modelos Lineares (por analogia aos Beta0 e Beta1 da Regressão Linear). No tocante à modelagem, foi utilizado o conhecimento adquirido no evento chamado "One Day Meeting" patrocinado pela UMinho, que contou ainda com mais técnicas de Machine Learning. Por fim, o mais importante para a confecção deste trabalho foi obtido na cadeira de Estatística Computacional, pois foi aprendido a utilizar o R e o SPSS (este software também é uma ferramenta fundamental para todos que utilizam a Estatística em seus trabalhos e estudos).
+
+Diante do exposto, foi imprescindível a criação de um capítulo exclusivo para o agradecimento à UMinho.
+
+## Referências.
+
++ Fatos históricos sobre o Titanic: (https://en.wikipedia.org/wiki/Titanic)
+
++ Cursos de Python, Data Science e Machine Learning: (https://www.youtube.com/c/DataICMC) - são alunos da Universidade de São Paulo que criaram este canal para compartilhar conhecimento.
+
++ Site com diversos cursos gratuitos, bases de dados e competições de Machine Learning: (https://www.kaggle.com)
+
++ Outros Canais do Youtube onde aprendi comandos sobre modelagem utilizando o R:
+(https://www.youtube.com/c/rdjalayer)
+(https://www.youtube.com/c/SimplilearnOfficial)
